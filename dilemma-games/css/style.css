@@ -340,3 +340,41 @@ details.raw { margin-top: 8px; font-size: .9rem; } details.raw summary { cursor:
 @media (max-width: 900px) { .solo .board-wrap .split, .solo .board-wrap .split.wide { grid-template-columns: 1fr; } }
 .solo .cols > div, .split > div { min-width: 0; }
 .solo .board-wrap table { display: block; overflow-x: auto; }
+
+/* Harvest Report: map of the republic (2026-11-25) */
+.rmap .rland { fill: var(--land); stroke: #b9a98a; stroke-width: 2; }
+.rmap .rhills { fill: #e8dcc0; } .rmap .rfields { fill: #efe3bd; }
+.rmap .river { fill: none; stroke: #9fc2d1; stroke-width: 12; stroke-linecap: round; opacity: .8; }
+.rmap .decor { fill: none; stroke: #b9a98a; stroke-width: 1.5; }
+.rmap .rregion { font: italic 13px var(--display); fill: #8a7a5a; }
+.rmap .cname { font: 700 14px var(--display); fill: var(--ink); }
+.rmap .gnum { font: 600 12px var(--sans); fill: var(--ink-soft); }
+.rmap .silo { fill: #fffdf8; stroke: #8a7a5a; stroke-width: 2.5; }
+.rmap .grainfill { fill: var(--grain); opacity: .85; }
+.rmap .siloroof { fill: none; stroke: #8a7a5a; stroke-width: 2.5; }
+.rmap .needline { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 5 4; }
+.rmap .granary.short .silo { stroke: var(--accent); }
+.rmap .rv .rvhouse { fill: #fffdf8; stroke: #8a7a5a; stroke-width: 2; }
+.rmap .rv .rvdoor { fill: #8a7a5a; } .rmap .rv .rvground { stroke: #b9a98a; stroke-width: 2; }
+.rmap .rv .rvnum { fill: var(--card); stroke: #8a7a5a; stroke-width: 1.5; }
+.rmap .rv .rvn { font: 700 13px var(--sans); fill: var(--ink); }
+.rmap .rv .rvnote { font: 700 10.5px var(--sans); fill: var(--ink-soft); }
+.rmap .rv.wait { opacity: .45; }
+.rmap .rv.in .rvhouse, .rmap .rv.in .rvnum { fill: var(--ok-soft); stroke: var(--ok); }
+.rmap .rv.low .rvhouse, .rmap .rv.low .rvnum, .rmap .rv.caught .rvhouse, .rmap .rv.caught .rvnum { fill: var(--accent-soft); stroke: var(--accent); }
+.rmap .rv.low .rvnote, .rmap .rv.caught .rvnote, .rmap .rv.purged .rvnote { fill: var(--accent); }
+.rmap .rv.high .rvhouse, .rmap .rv.high .rvnum { fill: var(--grain-soft); stroke: var(--gold); } .rmap .rv.high .rvnote { fill: var(--gold); }
+.rmap .rv.famine .rvhouse, .rmap .rv.famine .rvnum { fill: #d9d2c2; stroke: var(--ink); } .rmap .rv.famine .rvnote { fill: var(--ink); }
+.rmap .rv.purged .rvhouse { fill: #3a3f4b; stroke: var(--ink); } .rmap .rv.purged .rvnum { fill: #3a3f4b; stroke: var(--ink); } .rmap .rv.purged .rvn { fill: #fff; }
+.rmap .rv.insp .rvhouse, .rmap .rv.insp .rvnum { fill: #e3eef6; stroke: #2f6690; } .rmap .rv.insp .rvnote { fill: #2f6690; }
+.rmap .rv.premium .rvhouse, .rmap .rv.premium .rvnum, .rmap .rv.signed .rvhouse, .rmap .rv.signed .rvnum { fill: var(--ok-soft); stroke: var(--ok); } .rmap .rv.premium .rvnote, .rmap .rv.signed .rvnote { fill: var(--ok); }
+.rmap .rvhungry circle { fill: #fffdf8; stroke: var(--warn); stroke-width: 2; } .rmap .rvhungry path { stroke: var(--warn); stroke-width: 2; }
+.rmap .rv.dim { opacity: .55; } .rmap .youring { fill: none; stroke: var(--ink); stroke-width: 3; stroke-dasharray: 6 4; }
+.vkey i.hun { border-radius: 50%; border-color: var(--warn); }
+.vkey i.pur { background: #3a3f4b; border-color: var(--ink); }
+.stabbar { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin: 6px 0 4px; }
+.stabbar span { height: 14px; border-radius: 3px; }
+.stabbar span.L { background: var(--ok); } .stabbar span.M { background: var(--warn); } .stabbar span.H { background: var(--accent); } .stabbar span.off { background: var(--paper-2); }
+.linkchip { cursor: pointer; border: 1px solid var(--line); font: inherit; }
+.linkchip:hover { border-color: var(--accent); text-decoration: line-through; }
+.regev .chg .upv { color: var(--ok); } .regev .chg .downv { color: var(--accent); }

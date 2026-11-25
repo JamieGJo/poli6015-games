@@ -24,7 +24,8 @@ function start() {
   if (q.get('sheet') === '1') return sheet(G, code, key);
 
   let s = LS.get(key);
-  if (!s || s.game !== gameId) { s = G.newState(code, fairRandom); LS.set(key, s); LS.del(undoKey); }
+  // A game saved under older rules (a different engine version) is replaced by a new one.
+  if (!s || s.game !== gameId || s.v !== G.newState(code, fairRandom).v) { s = G.newState(code, fairRandom); LS.set(key, s); LS.del(undoKey); }
   LS.set(`dg:last:${gameId}`, code);
   history.replaceState(null, '', `?game=${gameId}&room=${code}`);
   document.title = `${G.TITLE} · projector`;
@@ -131,7 +132,7 @@ function start() {
   const sheetCh = new BroadcastChannel(`dg-sheet:${code}`);
   sheetCh.onmessage = (e) => {
     const a = e.data || {};
-    if (a.type === 'report' && s.players[a.pid]?.paper) commit(G.E.applyAction(s, { ...a, trusted: true }), false);
+    if ((a.type === 'report' || a.type === 'pledge') && s.players[a.pid]?.paper) commit(G.E.applyAction(s, { ...a, trusted: true }), false);
   };
 
   render();
@@ -160,6 +161,8 @@ function sheet(G, code, key) {
   document.addEventListener('change', (e) => {
     const el = e.target.closest('[data-paper]');
     if (el && el.value !== '') ch.postMessage({ type: 'report', pid: el.dataset.paper, value: Number(el.value) });
+    const pl = e.target.closest('[data-pledge]');
+    if (pl) ch.postMessage({ type: 'pledge', pid: pl.dataset.pledge, yes: pl.checked });
     setTimeout(draw, 150);
   });
   draw();

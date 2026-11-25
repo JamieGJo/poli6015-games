@@ -126,3 +126,73 @@ export function palaceScene() {
     <path d="M18 140v-20l6-6 6 6v20M190 140v-20l6-6 6 6v20" class="guard"/>
   </svg>`;
 }
+
+// ---------- the Harvest Report: a map of the republic and its villages (2026-11-25) ----------
+// Slots for up to 42 villages on a 9 × 5 grid around the capital, with a fixed jitter so the
+// map looks drawn, not tabulated. Villages are numbered in reading order across the map.
+const RMAP = { w: 900, h: 470, cols: 9, rows: 5, x0: 70, y0: 70, dx: 95, dy: 82 };
+const SLOTS = (() => {
+  const out = [];
+  let a = 7;
+  const r = () => { a = (a * 16807) % 2147483647; return a / 2147483647; };
+  for (let row = 0; row < RMAP.rows; row++) {
+    for (let col = 0; col < RMAP.cols; col++) {
+      if (row === 2 && col >= 3 && col <= 5) continue;       // the capital
+      out.push({ row, col, x: RMAP.x0 + col * RMAP.dx + (r() - 0.5) * 26 + (row % 2 ? 18 : 0), y: RMAP.y0 + row * RMAP.dy + (r() - 0.5) * 18 });
+    }
+  }
+  return out;
+})();
+// A fixed spread order, so 6 villages are scattered over the map rather than packed in one corner.
+const SPREAD = (() => {
+  const idx = SLOTS.map((_, i) => i);
+  let a = 11;
+  const r = () => { a = (a * 48271) % 2147483647; return a / 2147483647; };
+  // Interleave by checkerboard first, then the rest, each shuffled with a fixed seed.
+  const first = idx.filter((i) => (SLOTS[i].row + SLOTS[i].col) % 2 === 0), rest = idx.filter((i) => (SLOTS[i].row + SLOTS[i].col) % 2 === 1);
+  const sh = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+  return sh(first).concat(sh(rest));
+})();
+function slotsFor(n) {
+  const chosen = SPREAD.slice(0, Math.min(n, SLOTS.length)).map((i) => SLOTS[i]);
+  return chosen.sort((p, q) => p.row - q.row || p.col - q.col);
+}
+
+// villages: [{ n, st, note, hungry, you }], st as for villageTile plus 'purged', 'signed'.
+// granary: { have, need } or null.
+export function republicMap(villages, granary = null, opts = {}) {
+  const slots = slotsFor(villages.length);
+  const vs = villages.slice().sort((a, b) => a.n - b.n).map((v, i) => {
+    const p = slots[i] || { x: 40 + (i % 9) * 95, y: 440 };
+    const dim = opts.you && !v.you ? 'dim' : '';
+    return `<g class="rv ${v.st || ''} ${v.you ? 'you' : ''} ${dim}" transform="translate(${p.x} ${p.y})">
+      ${v.you ? '<circle r="40" cy="2" class="youring"/>' : ''}
+      <path d="M-18 8V-6l18-14 18 14V8z" class="rvhouse"/><path d="M-5 8v-8h10v8" class="rvdoor"/>
+      <path d="M-26 12h52" class="rvground"/>
+      <circle cy="24" r="12" class="rvnum"/><text y="28.5" text-anchor="middle" class="rvn">${v.n}</text>
+      ${v.hungry ? '<g class="rvhungry" transform="translate(16 -14)"><circle r="7"/><path d="M-3.5 0h7"/></g>' : ''}
+      ${v.note ? `<text y="49" text-anchor="middle" class="rvnote">${v.note}</text>` : ''}</g>`;
+  }).join('');
+  let gr = '';
+  if (granary) {
+    const f = Math.max(0, Math.min(1.25, granary.need ? granary.have / granary.need : 0));
+    const H = 70, fillH = Math.min(H, H * f);
+    gr = `<g class="granary ${granary.have >= granary.need ? 'fed' : 'short'}" transform="translate(450 236)">
+      <rect x="-26" y="${-H / 2}" width="52" height="${H}" rx="8" class="silo"/>
+      <rect x="-26" y="${H / 2 - fillH}" width="52" height="${fillH}" rx="${fillH > 8 ? 8 : 0}" class="grainfill"/>
+      <path d="M-26 ${-H / 2 + 2}q26-26 52 0" class="siloroof"/>
+      <line x1="-34" x2="34" y1="${-H / 2}" y2="${-H / 2}" class="needline"/>
+      <text x="0" y="${H / 2 + 18}" text-anchor="middle" class="cname">State granary</text>
+      <text x="0" y="${H / 2 + 34}" text-anchor="middle" class="gnum">${granary.have} of ${granary.need} the cities need</text></g>`;
+  } else {
+    gr = `<g class="capital" transform="translate(438 222)"><g class="capicon">${P.palace}</g><text x="12" y="42" text-anchor="middle" class="cname">The capital</text></g>`;
+  }
+  return `<svg class="map rmap" viewBox="0 0 ${RMAP.w} ${RMAP.h}" role="img" aria-label="Map of the republic and its villages">
+    <rect width="${RMAP.w}" height="${RMAP.h}" rx="14" class="rland"/>
+    <rect width="${RMAP.w}" height="150" rx="14" class="rhills"/><path d="M40 30l26-26 26 26M120 26l20-20 20 20M700 30l26-26 26 26M790 24l18-18 18 18" class="decor"/>
+    <rect y="330" width="${RMAP.w}" height="140" rx="14" class="rfields"/>
+    ${[...Array(18).keys()].map((i) => `<path d="M${20 + i * 50} 462v-14" class="decor"/>`).join('')}
+    <path d="M0 175 C150 205 260 150 390 200 S620 270 900 232" class="river"/>
+    <text x="20" y="20" class="rregion">The northern hills</text><text x="20" y="190" class="rregion">The river plain</text><text x="20" y="${RMAP.h - 12}" class="rregion">The southern fields</text>
+    ${gr}${vs}</svg>`;
+}

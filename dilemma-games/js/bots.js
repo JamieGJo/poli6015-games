@@ -8,16 +8,18 @@ export const ME = 'me';
 const pick = (mix, rand) => { const r = rand(); let acc = 0; return Object.keys(mix).find((t) => (acc += mix[t]) >= r) || Object.keys(mix)[0]; };
 
 // ================= The Harvest Report =================
-// You are one village among 19 computer villages. Their mix is the one simulated for the
-// design (30% honest, 40% "safe": report at least 7, 20% "nudge": add 2, 10% "max": always 9).
+// Two modes. "village": you are one village among 19 computer villages; the computer is the
+// Chairman. "chairman": you are the Chairman and all 20 villages are the computer's.
+// The villages' mix is the one simulated for the design (30% honest, 40% "safe": report at
+// least 7, 20% "nudge": add 2, 10% "max": always 9).
 export const HARVEST_MIX = { honest: 0.3, safe: 0.4, nudge: 0.2, max: 0.1 };
 export const HARVEST_TYPE_NAME = { honest: 'reports the truth', safe: 'reports at least 7 to stay safe', nudge: 'adds 2', max: 'always reports the most it can' };
 
-export function harvestSetup(rand, n = 20) {
-  let s = H.newGame('SOLO');
-  s = H.applyAction(s, { type: 'join', pid: ME, key: ME });
+export function harvestSetup(rand, n = 20, mode = 'village') {
+  let s = H.newGame('SOLO', mode === 'chairman' ? { payInspectors: true } : {});
+  if (mode !== 'chairman') s = H.applyAction(s, { type: 'join', pid: ME, key: ME });
   const kinds = {};
-  for (let i = 1; i < n; i++) {
+  for (let i = 1; i <= (mode === 'chairman' ? n : n - 1); i++) {
     const pid = `bot${i}`;
     s = H.applyAction(s, { type: 'join', pid, key: pid });
     kinds[pid] = pick(HARVEST_MIX, rand);
@@ -25,29 +27,39 @@ export function harvestSetup(rand, n = 20) {
   // Shuffle the village numbers so the human is not always village 1.
   const nums = H.shuffle(Object.keys(s.players).map((q) => s.players[q].n), rand);
   Object.keys(s.players).forEach((q, i) => { s.players[q].n = nums[i]; });
-  return { s: H.advance(s, rand), mem: { kinds } };
+  return { s: H.advance(s, rand), mem: { kinds, mode, decided: {} } };
 }
 
-// What a computer village reports. In Round 4 the types adapt to the inspectors: liars
-// shade their report to 1 above the truth, which no inspector can catch; "max" keeps
-// gambling. In Round 4b, villages that believed the premium report the truth.
-function botReport(kind, card, phase, believed) {
-  if (phase === 'r1') return card;
-  if (phase === 'r2') return Math.min(12, { honest: card, safe: Math.max(card, 7), nudge: card + 2, max: 9 }[kind]);
-  if (phase === 'r4b' && believed) return card;
+// What a computer village reports. With no quota there is nothing to fear, so everyone tells
+// the truth. Under a quota, the types inflate as simulated. In Round 4, with inspectors, liars
+// shade their report to 1 above the truth, which no inspector can catch; "max" keeps gambling.
+// Without inspectors they inflate as in Round 2. Signers are locked to the truth by the engine.
+function botReport(kind, card, phase, s) {
+  if (phase === 'r1' || H.quotaK(s) === 0) return card;
+  const r2 = Math.min(12, { honest: card, safe: Math.max(card, 7), nudge: card + 2, max: 9 }[kind]);
+  if (phase === 'r2' || !s.inspectors.length) return r2;
   return Math.min(12, { honest: card, safe: card + 1, nudge: card + 1, max: 9 }[kind]);
+}
+
+// Who signs the pledge: most honest villages; others mainly when their harvest is high enough
+// to be safe from the quota; fewer still if they have been re-educated once already.
+function botSigns(kind, me, rand) {
+  let p = kind === 'honest' ? 0.8 : me.card >= 6 ? 0.6 : 0.25;
+  if (me.reeducated) p *= 0.6;
+  return rand() < p;
 }
 
 export function harvestBots(s, mem, rand) {
   let t = s;
   const act = (a) => { t = H.applyAction(t, { ...a, key: a.pid }); };
   const bots = Object.keys(t.players).filter((q) => q !== ME);
+  if (t.regime.fell) return t;
   if (H.REPORT_PHASES[t.phase]) {
     for (const q of bots) {
       if (t.reports[t.phase][q] != null) continue;
       if (t.inspectors.includes(q) && t.phase.startsWith('r4')) continue;
       const card = H.privateView(t, q).card;
-      act({ type: 'report', pid: q, value: botReport(mem.kinds[q], card, t.phase, t.poll[q]) });
+      act({ type: 'report', pid: q, value: botReport(mem.kinds[q], card, t.phase, t) });
     }
   }
   if (t.phase === 'r4a_check' || t.phase === 'r4b_check') {
@@ -59,18 +71,17 @@ export function harvestBots(s, mem, rand) {
     }
   }
   if (t.phase === 'r4b_poll') {
-    for (const q of bots) if (t.poll[q] == null) act({ type: 'believe', pid: q, yes: rand() < (mem.kinds[q] === 'honest' ? 0.8 : 0.5) });
+    for (const q of bots) if (t.poll[q] == null && !t.inspectors.includes(q)) act({ type: 'pledge', pid: q, yes: botSigns(mem.kinds[q], H.privateView(t, q), rand) });
   }
-  if (t.phase === 'r4b_chair') t = H.chair(t, chairmanHonours(t));
+  if (t.phase === 'r4b_chair' && mem.mode !== 'chairman' && t.premium === null) t = H.chair(t, chairmanHonours(t));
   return t;
 }
 
-// The computer Chairman: honours the premium unless the reports still run well above the
-// true harvest (more than 10% over), in which case "the Plan has been reconsidered".
+// The computer Chairman pays the premium unless paying would cost the regime more Stability
+// than breaking his word.
 export function chairmanHonours(s) {
-  const rep = Object.values(s.reports.r4b).reduce((a, b) => a + b, 0);
-  const tru = Object.values(s.deals.C).reduce((a, b) => a + b, 0);
-  return rep <= tru * 1.1;
+  const P = H.chairPreview(s);
+  return !P || P.payStab <= P.renegeStab;
 }
 
 // ================= The Petition Box =================
