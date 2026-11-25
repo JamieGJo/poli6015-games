@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..800&family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/file-warning.js"></script>
+<title>Seize the State</title>
+</head>
+<body>
+<div class="landing">
+  <div class="box">
+    <div class="hero">
+      <div class="caps muted">POLI6015 Dictatorships · A class simulation</div>
+      <h1>Seize <span style="color:var(--accent)">the</span> State</h1>
+      <p class="prompt muted">Five teams found five states on the continent of Meridia, and find out how much of their fate the political science already predicts.</p>
+    </div>
+    <div class="choices">
+      <div class="card stack">
+        <h3>Join as a team</h3>
+        <p class="small muted">Enter the code shown on the main screen. One device per team.</p>
+        <input type="text" class="codeinput" id="code" maxlength="4" autocomplete="off" placeholder="CODE" aria-label="Join code">
+        <button class="btn btn-primary btn-big" id="join">Join</button>
+      </div>
+      <div class="card stack">
+        <h3>Run the class</h3>
+        <p class="small muted">Open this on the computer connected to the projector.</p>
+        <button class="btn btn-accent btn-big" id="start">Start a new class</button>
+        <div id="resume"></div>
+        <p class="tiny muted" id="modenote"></p>
+      </div>
+      <div class="card stack">
+        <h3>Play on your own</h3>
+        <p class="small muted">The whole game on one device, outside class: no main screen, no quizzes, no discussion. It saves in this browser.</p>
+        <label class="small row" style="gap:8px"><input type="checkbox" id="extra"> Include the extra: the dictator’s dilemma</label>
+        <label class="small row" style="gap:8px"><input type="checkbox" id="quick"> Quick start: a short Week 1 (territory, land, what came before), then Week 2</label>
+        <button class="btn btn-big" id="solo">Start a new game</button>
+        <div id="soloresume"></div>
+      </div>
+    </div>
+    <p class="tiny muted" style="text-align:center;margin-top:20px">Draft for Jamie Gruffydd-Jones. Not yet for students.</p>
+  </div>
+</div>
+<script type="module">
+import { newRoomCode } from './js/engine.js';
+import { FIREBASE_CONFIG } from './js/config.js';
+const $ = (s) => document.querySelector(s);
+const go = (page, room) => { location.href = page + '?room=' + encodeURIComponent(room); };
+$('#join').onclick = () => { const c = $('#code').value.trim().toUpperCase(); if (c.length === 4) go('team.html', c); else $('#code').focus(); };
+$('#code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#join').click(); });
+$('#start').onclick = () => { const r = newRoomCode(); try { localStorage.setItem('sts:lastroom', r); } catch (e) {} go('main.html', r); };
+let last = null; try { last = localStorage.getItem('sts:lastroom'); } catch (e) {}
+if (last) $('#resume').innerHTML = '<button class="btn btn-big" id="res">Resume class ' + last + '</button>';
+if (last) $('#res').onclick = () => go('main.html', last);
+$('#solo').onclick = () => { location.href = 'team.html?solo=1&new=1' + ($('#extra').checked ? '&extra=1' : '') + ($('#quick').checked ? '&start=2' : ''); };
+let soloSaved = null; try { soloSaved = localStorage.getItem('sts:solo'); } catch (e) {}
+if (soloSaved) { $('#soloresume').innerHTML = '<button class="btn" id="sres">Continue your game</button>'; $('#sres').onclick = () => { location.href = 'team.html?solo=1'; }; }
+$('#modenote').textContent = FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL
+  ? 'Live mode: teams can join from their own devices.'
+  : 'Local mode: no live server is set up, so team screens only work as tabs in this browser. See SETUP.md.';
+</script>
+</body>
+</html>

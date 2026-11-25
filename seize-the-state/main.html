@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..800&family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/file-warning.js"></script>
+<title>Seize the State · Main screen</title>
+</head>
+<body class="main">
+<div class="main-shell">
+  <header class="topbar">
+    <div class="wordmark">Seize <i>the</i> State</div>
+    <div class="muted small" id="weeklabel">Week 1 · Founding</div>
+    <nav class="steps" id="steps"></nav>
+    <div class="joinbox"><span class="small muted" id="joinhint">Join code</span><span class="code" id="code">····</span></div>
+    <button class="timer btn-ghost btn" id="timer" title="Click to restart the timer">0:00</button>
+  </header>
+  <main class="stage" id="stage"></main>
+  <footer class="bottombar">
+    <div class="teamrow grow" id="teams"></div>
+    <span class="chip" id="mode"></span>
+    <button class="btn btn-ghost" id="menu">Menu</button>
+    <button class="btn" id="back">Back</button>
+    <button class="btn btn-accent" id="reveal">Reveal</button>
+    <button class="btn btn-primary" id="next">Next</button>
+  </footer>
+</div>
+<dialog id="menudlg" style="border:1px solid var(--line);border-radius:12px;padding:20px;max-width:440px">
+  <h3>Main screen menu</h3>
+  <div class="stack">
+    <button class="btn" data-act="export">Download a save file (class results)</button>
+    <button class="btn" data-act="load">Load a save file</button>
+    <input type="file" id="loadfile" accept="application/json,.json" hidden>
+    <button class="btn" data-act="quizzes">Quizzes and prompts</button>
+    <button class="btn" data-act="wintrobe">Optional extra: the dictator’s dilemma</button>
+    <button class="btn" data-act="week2">Start Week 2 (Origins)</button>
+    <button class="btn" data-act="manual">Open a team screen in a new tab</button>
+    <button class="btn" data-act="remove">Remove a team</button>
+    <button class="btn" data-act="fullscreen">Full screen</button>
+    <a class="btn" href="index.html">Leave this class</a>
+    <p class="tiny muted">A save file carries the whole game, so you can continue next week on another computer: download it at the end of the class, then load it in a new room. The two switches change what teams see from the next screen on. Keys: right arrow next, left arrow back, R reveal, F full screen. Click a team’s name to open its screen in a new tab, for teams without a device.</p>
+    <button class="btn btn-primary" data-act="close">Close</button>
+  </div>
+</dialog>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

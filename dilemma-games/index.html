@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dictator's dilemma games</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>The dictator's dilemma: two games</h1>
+  <p class="muted">POLI6015, Week 1. One projector screen run by the seminar leader; students play on their phones. Draft for Jamie: not yet used with students.</p>
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-tab="harvest" role="tab">The Harvest Report</button>
+    <button class="tab" data-tab="petition" role="tab">The Petition Box</button>
+  </div>
+  <section class="panel" id="harvest">
+    <p>Every student is a numbered province with a secret harvest. They report it to the Chairman, first with nothing at stake, then under a quota that punishes the lowest. The state takes grain on the strength of the reports. Two fixes follow: rival inspectors, and a premium for honesty that the Chairman may not pay. About 30 minutes, one phone per student.</p>
+    <p class="small muted">Wintrobe (1998), ch. 1: fear makes reports false (p. 22); the enforcement problem (pp. 25–26); competing agencies (pp. 34–35).</p>
+    <div class="rowc"><a class="btn primary" href="host.html?game=harvest">Open the projector screen</a><a class="btn" href="play.html" target="_blank" rel="noopener">Join on a phone (new tab)</a></div>
+  </section>
+  <section class="panel hidden" id="petition">
+    <p>One team rules; four teams are provinces with a hidden grievance; the Police Chief has a private phone. Each year the Palace spends 8 tokens on gifts, police, petition boxes, the Chief or a Swiss account, and the provinces praise, stay silent, petition or protest. Do you open the box? About 35 minutes over four years, one phone per team plus one for the Chief.</p>
+    <p class="small muted">Wintrobe (1998), ch. 1: the paradox and the subject's dilemma (p. 22); repression and loyalty (p. 33); the security forces as the main threat (p. 34); rents (p. 36); power traded for security (p. 38).</p>
+    <div class="rowc"><a class="btn primary" href="host.html?game=petition">Open the projector screen</a><a class="btn" href="play.html" target="_blank" rel="noopener">Join on a phone (new tab)</a></div>
+  </section>
+  <div class="card flat">
+    <div class="caps">Running it</div>
+    <p class="small">Open the projector screen on the leader's laptop. Students go to the address it shows and type the four-letter code. In local mode (the default), phones can only be tabs of the same browser: good for rehearsal. For students' own phones the site needs hosting and a Firebase database; see <code>README.md</code>.</p>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === t));
+    document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('hidden', p.id !== t.dataset.tab));
+    try { localStorage.setItem('dg:tab', t.dataset.tab); } catch (e) {}
+  }));
+  try { const t = localStorage.getItem('dg:tab'); if (t) document.querySelector(`[data-tab="${t}"]`)?.click(); } catch (e) {}
+</script>
+</body>
+</html>
