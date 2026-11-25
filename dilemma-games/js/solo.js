@@ -27,7 +27,9 @@ const DEBRIEF = {
     <p>The Palace never saw grievance, only signals. Praise under police is cheap and tells it nothing; a petition is costly to allow but tells the truth.</p>
     <ul><li>How well did the Palace's guesses match the real moods on the map?</li>
     <li>Did police make the provinces calmer, or only quieter? What did they do to the Police Chief's strength?</li>
-    <li>Was opening a petition box worth 2 tokens?</li></ul>
+    <li>Was opening a petition box worth 2 tokens?</li>
+    <li>Who hid their grievance because they did not know where the police were? Would you have protested if you had known?</li>
+    <li>Did the Palace ever reward a province that protested? What did that teach the other provinces?</li></ul>
     <p class="small muted">Wintrobe (1998), ch. 1: the paradox and the subject's dilemma (p. 22); repression and loyalty (p. 33); the security forces as the main threat (p. 34).</p>`,
 };
 
@@ -40,7 +42,7 @@ function start() {
   const LS = U.store('local');
   const key = `dg:solo:${game}`;
   let saved = LS.get(key);
-  if (saved && game === 'harvest' && saved.s?.v !== HarvestUI.E.newGame('X').v) saved = null;  // saved under older rules
+  if (saved && saved.s?.v !== (game === 'harvest' ? HarvestUI.E.newGame('X').v : PetitionUI.E.newGame('X').v)) saved = null;  // saved under older rules
   document.title = `${G.TITLE} · against the computer`;
   const app = document.createElement('div'); app.className = 'solo';
   document.body.innerHTML = ''; document.body.appendChild(app);

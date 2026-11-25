@@ -32,7 +32,7 @@ export function newGame(room, settings = {}, rand = Math.random) {
   const prov = {};
   PROVS.forEach((k, i) => { prov[k] = { g: starts[i], pts: 0, box: false, police: false, pending: null, gifts: 0, answered: 0, protests: 0, crushed: 0, event: null, eventYear: 0, notes: [] }; });
   return {
-    game: 'petition', v: 1, room, settings: { ...DEFAULT_SETTINGS, ...settings },
+    game: 'petition', v: 2, room, settings: { ...DEFAULT_SETTINGS, ...settings },
     seats: {}, players: {}, year: 0, step: 'lobby', stab: STAB0, strength: 0, prov,
     palace: { saved: 0, rival: false, rivalYear: 0, paid: 0, whisper: null, est: {}, plan: null, spent: null },
     chiefs: [{ score: 0, from: 1 }], chiefPurged: false,
@@ -49,6 +49,10 @@ export function shuffle(arr, rand) {
 const d6 = (rand) => 1 + Math.floor(rand() * 6);
 
 export const seatOf = (s, pid) => s.players[pid]?.seat || null;
+// Police places are secret from the provinces (and the projector) until the signals are read;
+// only the number placed is public. Rebalanced 2026-11-25: plans/2026-11-25_petition-secret-police.md.
+export const policeHidden = (s) => s.step === 'event' || s.step === 'signals';
+export const policeCount = (s) => PROVS.filter((k) => s.prov[k].police).length;
 
 // ---------- the Palace's plan: validation and cost ----------
 export function planCost(s, plan) {
@@ -237,8 +241,8 @@ function applyPlan(s) {
   const parts = [];
   const gifts = PROVS.filter((k) => plan.gifts[k]).map((k) => `${plan.gifts[k]} to ${SEAT_NAME[k]}`);
   if (gifts.length) parts.push(`gives gifts (${gifts.join(', ')})`);
-  const pol = PROVS.filter((k) => plan.police[k]).map((k) => SEAT_NAME[k]);
-  if (pol.length) parts.push(`places police in ${pol.join(', ')}`);
+  const pol = PROVS.filter((k) => plan.police[k]).length;
+  if (pol) parts.push(`stations police in ${pol === 1 ? 'one province' : `${pol} provinces`} (where stays secret until the signals are read)`);
   const op = PROVS.filter((k) => plan.open[k]).map((k) => SEAT_NAME[k]);
   if (op.length) parts.push(`opens the box in ${op.join(', ')}`);
   const an = PROVS.filter((k) => plan.answer[k]).map((k) => SEAT_NAME[k]);
@@ -282,6 +286,8 @@ function resolve(s) {
       }
     } else revealed[k] = { signal: sig[k] };
   }
+  const placed = PROVS.filter((k) => s.prov[k].police).map((k) => SEAT_NAME[k]);
+  if (placed.length) lines.unshift(`The police stood in ${placed.join(', ')}.`);
   const readNow = PROVS.some((k) => sig[k] === 'petition');
   s.readAloud[s.year] = readNow;
   if (unpoliced.length >= 2) {
@@ -333,12 +339,12 @@ export function publicView(s) {
     game: 'petition', room: s.room, settings: s.settings, year: s.year, step: s.step, stab: Math.max(0, s.stab), strength: s.strength,
     seats: Object.fromEntries(SEATS.map((k) => [k, !!s.seats[k]])),
     boxes: Object.fromEntries(PROVS.map((k) => [k, s.prov[k].box])),
-    police: Object.fromEntries(PROVS.map((k) => [k, s.prov[k].police])),
+    police: Object.fromEntries(PROVS.map((k) => [k, !policeHidden(s) && s.prov[k].police])), policeCount: policeCount(s), policeHidden: policeHidden(s),
     pending: Object.fromEntries(PROVS.map((k) => [k, !!s.prov[k].pending])),
     rival: s.palace.rival, planIn: !!s.palace.plan, estIn: s.palace.estYear === s.year,
     signalsIn: PROVS.filter((k) => s.signals[k]).length,
     chiefDecided: s.chiefChoice !== null, chiefChoice: s.step === 'chief' ? null : s.chiefChoice,
-    coupRoll: s.coupRoll, revealed: s.revealed, lastPlan: s.lastPlan || null, lastResolve: s.lastResolve || null, spent: s.palace.spent && { ...s.palace.spent, unspent: undefined },
+    coupRoll: s.coupRoll, revealed: s.revealed, lastPlan: s.lastPlan || null, lastResolve: s.lastResolve || null, spent: s.palace.spent && { ...s.palace.spent, unspent: undefined, police: policeHidden(s) ? {} : s.palace.spent.police },
     log: s.log.slice(-40), end: s.end, coupLine: COUP_FROM,
   };
   if (s.end) {
@@ -355,10 +361,12 @@ export function privateView(s, pid) {
   const out = { seat };
   if (PROVS.includes(seat)) {
     const P = s.prov[seat];
-    out.g = P.g; out.band = BAND(P.g); out.pts = P.pts; out.box = P.box; out.police = P.police; out.pending = !!P.pending;
+    const hid = policeHidden(s);
+    out.g = P.g; out.band = BAND(P.g); out.pts = P.pts; out.box = P.box; out.police = !hid && P.police; out.pending = !!P.pending;
+    out.policeCount = policeCount(s); out.policeHidden = hid;
     out.event = P.eventYear === s.year ? { roll: P.event, ...EVENTS[P.event] } : null;
     out.signal = s.signals[seat] || null;
-    out.notes = P.notes || [];
+    out.notes = (P.notes || []).filter((n) => !(hid && n.kind === 'police'));
   }
   if (seat === 'palace') {
     out.plan = s.palace.plan; out.saved = s.palace.saved; out.whisper = s.palace.whisper;

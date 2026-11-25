@@ -102,7 +102,8 @@ export const PALACE_STYLES = {
   harsh: 'Harsh: police in every province every year, and the rest of the budget paid to the Police Chief.',
 };
 // Computer provinces: each is
-// either sincere (signals its real mood) or mixed (protests 35% of the time regardless).
+// either sincere (signals its real mood, but hides anger when 2 or more police are out) or mixed
+// (protests 35% of the time regardless).
 // Computer Chief: strikes when the chance of success is at least one in three.
 export function petitionSetup(rand, mySeat, palaceStyle = 'balanced') {
   let s = P.newGame('SOLO', {}, rand);
@@ -140,8 +141,12 @@ function palacePlan(pub, last, style = 'balanced') {
 }
 
 function provinceSignal(kind, v, rand) {
-  const sincere = () => (v.police ? (v.g >= 4 ? 'praise' : 'silence') : v.g >= 7 ? 'protest' : v.g >= 4 ? (v.box ? 'petition' : 'silence') : 'praise');
-  const aggressive = () => (v.police ? 'praise' : 'protest');
+  // Police places are secret until the signals are read: an angry sincere province protests only
+  // when 0 or 1 police were placed this year; otherwise it praises. The mixed type still
+  // protests at random, now at real risk.
+  const risky = v.police || v.policeCount >= 2;
+  const sincere = () => (v.g >= 7 ? (risky ? 'praise' : 'protest') : v.g >= 4 ? (v.box ? 'petition' : 'silence') : 'praise');
+  const aggressive = () => 'protest';
   return kind === 'sincere' ? sincere() : rand() < 0.35 ? aggressive() : sincere();
 }
 

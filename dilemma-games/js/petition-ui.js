@@ -79,7 +79,9 @@ function palaceDid(v) {
   }
   for (const k of lp?.ignored || []) rows.push(['answer', 'bad', `Ignored the petition from ${N[k]}. Their grievance rises by 1.`]);
   const pol = E.PROVS.filter((k) => sp.police[k]);
-  if (pol.length) rows.push(['police', 'warn', `Stationed police in ${pol.map((k) => N[k]).join(', ')}. Any protest there this year will be crushed.`]);
+  if (v.policeHidden && v.policeCount === E.PROVS.length) rows.push(['police', 'warn', 'Stationed police in <b>every province</b>. Any protest this year will be crushed.']);
+  else if (v.policeHidden && v.policeCount) rows.push(['police', 'warn', `Stationed police in ${v.policeCount === 1 ? 'one province' : `${v.policeCount} provinces`}. <b>Where is secret</b> until the signals are read. Any protest where they stand will be crushed.`]);
+  else if (pol.length) rows.push(['police', 'warn', `Stationed police in ${pol.map((k) => N[k]).join(', ')}. Any protest there this year will be crushed.`]);
   if (lp?.rival) rows.push(['eye', 'warn', `Bought a rival agency: Police Strength ${lp.rivalFrom} → ${Math.floor(lp.rivalFrom / 2)}.`]);
   if (lp && lp.strengthTo !== lp.strengthFrom) rows.push(['police', 'warn', `Police Strength ${lp.strengthFrom} → ${lp.strengthTo}.`]);
   if (!rows.length) rows.push(['palace', '', 'Nothing the public can see.']);
@@ -90,6 +92,8 @@ function palaceDid(v) {
 function whatHappened(v) {
   const R = v.lastResolve; if (!R) return '';
   const rows = [];
+  const stood = E.PROVS.filter((k) => v.police[k]);
+  rows.push(['police', stood.length ? 'warn' : '', stood.length ? `<b>The police stood in ${stood.map((k) => N[k]).join(', ')}.</b>` : 'There were no police anywhere this year.']);
   for (const k of E.PROVS) {
     const r = v.revealed[k];
     if (r.signal === 'praise') rows.push(['praise', '', `<b>${N[k]}</b> praised the leader. It tells the Palace nothing.`]);
@@ -153,7 +157,7 @@ export function hostView(v, ctx) {
       praise: 'Safe. The Palace learns nothing about your mood.',
       silence: 'Safe. The Palace learns nothing.',
       petition: 'Only with an open petition box. Your true mood is read out to everyone: the Palace learns the truth, and so do the other provinces.',
-      protest: 'Costs the province 1 point. With no police there, the regime loses stability. Where police are stationed, the protest is crushed.',
+      protest: `Costs the province 1 point. With no police there, the regime loses stability. Where police are stationed, the protest is crushed. ${v.policeCount === E.PROVS.length ? 'This year there are police in every province.' : v.policeCount ? `This year there are police in ${v.policeCount === 1 ? 'one province' : `${v.policeCount} provinces`}, and only the Palace knows which.` : 'This year the Palace placed no police.'}`,
     }[k]}</div></div>`).join('')}</div>` + palaceDid(v);
   } else if (st === 'resolve') {
     ex = explain({ title: 'Step 4 of 6 · What happened', what: 'The signals, all at once, and what they did to the regime.', who: '', todo: '' });
@@ -193,6 +197,8 @@ function endView(v, ctx = {}) {
   <div class="card flat"><div class="caps">Debrief</div><ol class="small">
     <li>Did police buy safety, or blindness? Wintrobe's paradox (p. 22), beside Mobutu's officials reporting that "the situation is calm" (pp. 24–25).</li>
     <li>Who praised while angry, and why? Who protested or petitioned while calm?</li>
+    <li>Who hid their grievance because they did not know where the police were? Would you have protested if you had known?</li>
+    <li>Did the Palace ever reward a province that protested? What did that teach the other provinces?</li>
     <li>What did the rival agency and the payments to the Chief buy? Was the Police Chief more dangerous than the provinces (p. 34)?</li>
     <li>Was the petition box worth opening?</li>
     <li>Who paid the cost?</li></ol></div>`;
@@ -282,7 +288,8 @@ function provinceView(v, me) {
       praise: 'Tell the capital all is well. Safe. The Palace learns nothing about your mood.',
       silence: 'Say nothing. Safe. The Palace learns nothing.',
       petition: me.box ? `Your true mood (${BW[me.band]}) is read out to the whole room. Next year the Palace can answer it (grievance −2, +2 points) or ignore it (grievance +1).` : 'You have no petition box. Only the Palace can open one.',
-      protest: me.police ? 'Police are here: your protest will be crushed. −3 points, grievance +1, and the police grow stronger. The regime loses no stability.' : `Take to the streets. Costs you 1 point. The regime loses ${big ? 2 : 1} stability: a ${big ? 'large' : 'small'} protest, because your grievance is ${me.g}. If another province protests too, it loses 1 more.`,
+      protest: me.policeHidden && me.policeCount === E.PROVS.length ? 'Police are stationed in every province this year: your protest will be crushed. −3 points in all, grievance +1, and the police grow stronger. The regime loses no stability.'
+        : me.policeHidden && me.policeCount ? `Take to the streets. Costs you 1 point. <b>Police are stationed in ${me.policeCount === 1 ? 'one province' : `${me.policeCount} provinces`}, and you do not know which.</b> If they are here, your protest is crushed: −3 points in all, grievance +1, and the police grow stronger. If not, the regime loses ${big ? 2 : 1} stability.` : me.police ? 'Police are here: your protest will be crushed. −3 points, grievance +1, and the police grow stronger. The regime loses no stability.' : `Take to the streets. Costs you 1 point. The regime loses ${big ? 2 : 1} stability: a ${big ? 'large' : 'small'} protest, because your grievance is ${me.g}. If another province protests too, it loses 1 more.`,
     };
     h += `<h3>What do you tell the capital?</h3>${['praise', 'silence', 'petition', 'protest'].map((k) => `<button class="sigc ${k} ${me.signal === k ? 'on' : ''}" data-act="signal" data-v="${k}" ${k === 'petition' && !me.box ? 'disabled' : ''}>${icon(SIG_ICON[k])}<b>${SIG_LABEL[k]}</b><span>${opts[k]}</span></button>`).join('')}
       <p class="muted small">${me.signal ? `Sent: ${SIG_LABEL[me.signal]}. You can change it until the leader reveals the signals.` : 'Not sent yet.'}</p>`;
