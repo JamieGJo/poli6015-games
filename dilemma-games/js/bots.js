@@ -16,7 +16,7 @@ export const HARVEST_MIX = { honest: 0.3, safe: 0.4, nudge: 0.2, max: 0.1 };
 export const HARVEST_TYPE_NAME = { honest: 'reports the truth', safe: 'reports at least 7 to stay safe', nudge: 'adds 2', max: 'always reports the most it can' };
 
 export function harvestSetup(rand, n = 20, mode = 'village') {
-  let s = H.newGame('SOLO', mode === 'chairman' ? { payInspectors: true } : {});
+  let s = H.newGame('SOLO', mode === 'chairman' ? { payInspectors: true, boost: true } : {});
   if (mode !== 'chairman') s = H.applyAction(s, { type: 'join', pid: ME, key: ME });
   const kinds = {};
   for (let i = 1; i <= (mode === 'chairman' ? n : n - 1); i++) {
@@ -27,16 +27,21 @@ export function harvestSetup(rand, n = 20, mode = 'village') {
   // Shuffle the village numbers so the human is not always village 1.
   const nums = H.shuffle(Object.keys(s.players).map((q) => s.players[q].n), rand);
   Object.keys(s.players).forEach((q, i) => { s.players[q].n = nums[i]; });
-  return { s: H.advance(s, rand), mem: { kinds, mode, decided: {} } };
+  // The computer Chairman's character, secret until the debrief: half the time he keeps his
+  // word; otherwise he breaks it whenever paying would leave the cities short.
+  const chairType = rand() < 0.5 ? 'keeps' : 'breaks';
+  return { s: H.advance(s, rand), mem: { kinds, mode, decided: {}, chairType } };
 }
 
 // What a computer village reports. With no quota there is nothing to fear, so everyone tells
-// the truth. Under a quota, the types inflate as simulated. In Round 4, with inspectors, liars
+// the truth, unless the state has announced it will take three-quarters: then all but the
+// honest hide grain (2 below the truth, at least 1). Under a quota, the types inflate as simulated. In Round 4, with inspectors, liars
 // shade their report to 1 above the truth, which no inspector can catch; "max" keeps gambling.
 // Without inspectors they inflate as in Round 2. Signers are locked to the truth by the engine.
 function botReport(kind, card, phase, s) {
-  if (phase === 'r1' || H.quotaK(s) === 0) return card;
-  const r2 = Math.min(12, { honest: card, safe: Math.max(card, 7), nudge: card + 2, max: 9 }[kind]);
+  if (phase === 'r1') return card;
+  if (H.quotaK(s) === 0) return phase === 'r2' && s.policy.rate >= 0.75 && kind !== 'honest' ? Math.max(1, card - 2) : card;
+  const r2 = Math.min(12, { honest: card, safe: Math.max(card, 7), nudge: card + 2, max: Math.max(9, card) }[kind]);
   if (phase === 'r2' || !s.inspectors.length) return r2;
   return Math.min(12, { honest: card, safe: card + 1, nudge: card + 1, max: 9 }[kind]);
 }
@@ -73,15 +78,17 @@ export function harvestBots(s, mem, rand) {
   if (t.phase === 'r4b_poll') {
     for (const q of bots) if (t.poll[q] == null && !t.inspectors.includes(q)) act({ type: 'pledge', pid: q, yes: botSigns(mem.kinds[q], H.privateView(t, q), rand) });
   }
-  if (t.phase === 'r4b_chair' && mem.mode !== 'chairman' && t.premium === null) t = H.chair(t, chairmanHonours(t));
+  if (t.phase === 'r4b_chair' && mem.mode !== 'chairman' && t.premium === null) t = H.chair(t, chairmanHonours(t, mem.chairType));
   return t;
 }
 
-// The computer Chairman pays the premium unless paying would cost the regime more Stability
-// than breaking his word.
-export function chairmanHonours(s) {
+// The computer Chairman. "keeps": pays unless paying would cost the regime more Stability than
+// breaking his word. "breaks": also breaks it whenever paying would leave the cities short.
+export function chairmanHonours(s, type = 'keeps') {
   const P = H.chairPreview(s);
-  return !P || P.payStab <= P.renegeStab;
+  if (!P) return true;
+  if (type === 'breaks' && P.granaryTo < P.need) return false;
+  return P.payStab <= P.renegeStab;
 }
 
 // ================= The Petition Box =================

@@ -46,7 +46,7 @@ export const GLOSS = [
   ['Re-education', 'Punishment for the villages reporting least: you lose 2 sacks.'],
   ['The purge', 'A village re-educated a second time is purged: it loses all the grain it has kept so far.'],
   ['Promotion', 'Reward for the villages reporting most: you gain 2 sacks.'],
-  ['Regime Stability', 'How firmly the Chairman holds power, from 10. If it reaches 0, the villages rise and the regime falls.'],
+  ['Regime Stability', 'How firmly the Chairman holds power, from 10. Each famine village costs 2; every 5 hungry villages cost 1; so do hungry cities and broken promises. At 0 the villages rise and the regime falls.'],
   ['Your score', 'The grain you keep, over all the harvests. Most grain wins.'],
 ];
 
@@ -141,7 +141,8 @@ export function regimeEvents(v, round) {
     const stabRow = e.stabTo !== e.stabFrom ? change('Regime Stability', e.stabFrom, e.stabTo, '') : '';
     if (e.kind === 'collect') return change('State granary', e.granaryFrom, e.granaryTo, `procurement; the cities need ${v.regime.need}`)
       + (e.stabTo !== e.stabFrom ? change('Regime Stability', e.stabFrom, e.stabTo, `the cities are ${e.short} sacks short and go hungry`) : '<div class="chg"><span class="chl">The cities</span><span class="chv">fed</span></div>');
-    if (e.kind === 'famine') return change('Regime Stability', e.stabFrom, e.stabTo, `famine in ${plural(e.n, 'village', 'villages')}`);
+    if (e.kind === 'famine') return change('Regime Stability', e.stabFrom, e.stabTo, `famine in ${plural(e.n, 'village', 'villages')}, ${E.FAMINE_COST} each`);
+    if (e.kind === 'hunger') return change('Regime Stability', e.stabFrom, e.stabTo, `${plural(e.n, 'more village goes', 'more villages go')} hungry, 1 for every ${E.HUNGRY_PER}`);
     if (e.kind === 'inspectors') return change('State granary', e.granaryFrom, e.granaryTo, `${plural(e.n, 'inspector', 'inspectors')} paid ${E.INSPECTOR_COST} sacks each`) + (stabRow && change('Regime Stability', e.stabFrom, e.stabTo, 'the cities go short'));
     if (e.kind === 'premium') return change('State granary', e.granaryFrom, e.granaryTo, `${E.PREMIUM} sacks to each of ${plural(e.n, 'confirmed signer', 'confirmed signers')}`) + (stabRow && change('Regime Stability', e.stabFrom, e.stabTo, 'the cities go short'));
     if (e.kind === 'renege') return change('Regime Stability', e.stabFrom, e.stabTo, `the Chairman broke his word to ${plural(e.n, 'village', 'villages')} that signed`);
@@ -182,15 +183,21 @@ export function hostView(v, ctx) {
         + `<div class="stakes"><div class="lo">${icon('down')} <b>Lowest ${k} reports:</b> re-educated, −2 sacks.</div><div class="hi">${icon('up')} <b>Highest ${k} reports:</b> promoted, +2 sacks.</div></div>
         <div class="story bad">${icon('crushed')}<p><span class="st">Re-educated twice means purged.</span> A village sent for re-education a second time in this game loses <b>all</b> the grain it has kept so far.</p></div>`
       : chairman('The Plan trusts the people. Report your harvest; nobody will be punished or promoted this year.', '<p class="small">Fields can now produce up to 12.</p>');
-    main += `<p class="muted">A new harvest card has <b>not</b> been dealt: your harvest is the same as in Round 1. Ties on the line are broken by lot, in public.</p>`;
+    // In class Round 3 stays a surprise (rules doc: "Do not announce Round 3 in advance");
+    // only the player Chairman announces the tax with the Plan.
+    if (ctx?.solo === 'chairman') main += `<div class="story warn">${icon('sack')}<p><span class="st">After the reports, the state collects ${RATE(v.policy.rate)} of what each village reported,</span> rounded up, out of the grain it really grew.</p></div>`;
+    const boost = v.policy?.boost ? E.QUOTA_BOOST[k] || 0 : 0;
+    main += boost
+      ? `<div class="story">${icon('up')}<p><span class="st">Mobilisation:</span> under the quota every village really grows ${plural(boost, 'more sack', 'more sacks')} than in Round 1.</p></div>`
+      : `<p class="muted">A new harvest card has <b>not</b> been dealt: your harvest is the same as in Round 1. Ties on the line are broken by lot, in public.</p>`;
   } else if (ph === 'r2') {
     main = chairman('Enter your harvest.', `<p class="small">${k ? `The lowest ${k} are re-educated (−2), the highest ${k} promoted (+2). ` : ''}Reports can go up to 12.</p>`) + showMap(v, 'sub:r2') + `<p class="status">${waiting(v, 'r2')}</p>`;
   } else if (ph === 'r2_done') {
-    main = explain({ title: 'Round 2: the quota', what: `The reported harvest went from ${v.r1.total} to ${v.r2.total}. Nobody's real harvest changed.` })
+    main = explain({ title: 'Round 2: the quota', what: `The reported harvest went from ${v.r1.total} to ${v.r2.total}. ${v.policy?.boost && E.QUOTA_BOOST[k] ? `Mobilisation added only ${E.QUOTA_BOOST[k] * v.r2.count} real sacks (${E.QUOTA_BOOST[k]} a village).` : "Nobody's real harvest changed."}` })
       + `<div class="stats">${big('Reported total', v.r2.total, 'warn')}${big('Average report', (v.r2.total / Math.max(1, v.r2.count)).toFixed(1))}${big('Round 1 total', v.r1.total, 'dim')}</div>${showMap(v, 'r2')}${mapKey([KEY.low, KEY.high])}${quotaBlock(v.r2, k)}`;
   } else if (ph === 'r3_done') {
     const r = v.r3;
-    main = chairman(`The harvest is magnificent. The cities need ${v.regime.need} sacks of grain to eat. The state will now collect its share: ${RATE(r.rate)} of what each village reported, rounded up.`, '<p class="small">Each village pays out of the grain it really grew. A village that cannot pay hands over everything: famine. A village left with fewer than 2 sacks goes hungry this winter.</p>')
+    main = chairman(`The harvest is magnificent. The cities need ${v.regime.need} sacks of grain to eat. The state will now collect its share: ${RATE(r.rate)} of what each village reported, rounded up.`, `<p class="small">Each village pays out of the grain it really grew. A village that cannot pay hands over everything: famine (Stability −${E.FAMINE_COST} each). A village left with fewer than ${E.HUNGRY_BELOW} sacks goes hungry this winter (Stability −1 for every ${E.HUNGRY_PER} more).</p>`)
       + fallen(v)
       + `<div class="stats">${big('Really grown', r.trueTotal)}${big('Reported', r.reportedTotal, 'warn')}${big('Gap', `+${r.reportedTotal - r.trueTotal}`, 'warn')}${big('Granary', `${v.regime.granary}/${v.regime.need}`, v.regime.granary < v.regime.need ? 'bad' : '')}${big('Famine villages', r.famine.length, r.famine.length ? 'bad' : '')}${big('Hungry villages', r.hungry.length, r.hungry.length ? 'warn' : '')}</div>
       ${regimeEvents(v, 'r3')}
@@ -249,7 +256,7 @@ function roundReveal(r, v, mode) {
 
 function endView(v) {
   const rows = [
-    { label: 'Round 1 (nothing at stake)', rep: v.r1.total, tru: v.r3?.trueTotal ?? null },
+    { label: 'Round 1 (nothing at stake)', rep: v.r1.total, tru: v.r3?.r1True ?? v.r3?.trueTotal ?? null },
     { label: 'Round 2 (the quota)', rep: v.r2.total, tru: v.r3?.trueTotal ?? null },
   ];
   if (v.r4a) rows.push({ label: 'Round 4a (inspectors)', rep: v.r4a.reportedTotal, tru: v.r4a.trueTotal });

@@ -17,6 +17,10 @@ export const INSPECTOR_COST = 3;  // sacks from the granary per inspector (only 
 export const PREMIUM = 2;         // sacks paid to each confirmed signer, from the granary
 export const RENEGE_PER = 3;      // Stability −1 for every 3 signers, rounded up, if the Chairman reneges
 export const HUNGRY_BELOW = 2;    // a village left with fewer sacks after the collection is hungry
+// Chairman mode only: a quota mobilises the villages, raising each real Round 2 harvest.
+export const QUOTA_BOOST = { 0: 0, 2: 1, 3: 2 };
+export const FAMINE_COST = 2;     // Stability lost per famine village
+export const HUNGRY_PER = 5;      // Stability −1 for every 5 hungry villages not in famine
 export const RATES = [0.25, 0.5, 0.75];
 export const DEFAULT_POLICY = { k: null, rate: 0.5, inspectors: 2, premium: true }; // the class script
 const PAIRS = [[5, 5], [4, 6], [3, 7], [2, 8], [4, 6], [1, 9], [3, 7], [2, 8], [4, 6]];
@@ -53,7 +57,7 @@ export const maxReport = (ph) => (ph === 'r1' ? 9 : 12);
 
 export function newGame(room, policy = {}) {
   return {
-    game: 'harvest', v: 2, room, phase: 'lobby', players: {}, nextN: 1,
+    game: 'harvest', v: 4, room, phase: 'lobby', players: {}, nextN: 1,
     deals: {}, reports: { r1: {}, r2: {}, r4a: {}, r4b: {} }, res: {}, inspectors: [],
     checks: { r4a: {}, r4b: {} }, poll: {}, premium: null,
     policy: { ...DEFAULT_POLICY, ...policy },
@@ -125,7 +129,7 @@ export function removeProvince(s0, pid) {
 
 // The regime's choices. In class they stay as the script sets them (DEFAULT_POLICY); in
 // "play as the Chairman" the player makes each one before the step that uses it.
-export const POLICY_UNTIL = { k: 'r2_brief', rate: 'r2_done', inspectors: 'r3_done', premium: 'r4a_done' };
+export const POLICY_UNTIL = { k: 'r2_brief', rate: 'r2_brief', inspectors: 'r3_done', premium: 'r4a_done' };
 export function setPolicy(s0, key, value) {
   if (!(key in POLICY_UNTIL) || at(s0, POLICY_UNTIL[key]) > 0) return s0;
   const ok = { k: [0, 2, 3], rate: RATES, inspectors: [0, 1, 2], premium: [true, false] }[key].includes(value);
@@ -216,6 +220,11 @@ export function advance(s0, rand) {
   const k = quotaK(s);
   const P = s.policy;
   if (s.phase === 'lobby') { deal(s, 'A', rand); s.regime.need = NEED_PER * provinceCount(s); }
+  // Chairman mode: the quota's mobilisation raises each real harvest from Round 2 (Round 1's is kept).
+  if (s.phase === 'r1_done' && P.boost && QUOTA_BOOST[k]) {
+    s.deals.A0 = { ...s.deals.A };
+    for (const q of Object.keys(s.deals.A)) s.deals.A[q] += QUOTA_BOOST[k];
+  }
   if (s.phase === 'r2') s.res.r2 = quota(s.reports.r2, k, rand);
   if (s.phase === 'r2_done') {
     // Round 3: the state takes its share of each Round 2 report (half in class), rounded up, out of the true harvest.
@@ -229,7 +238,12 @@ export function advance(s0, rand) {
     }
     s.res.r3 = { take, paid, famine, rate: P.rate };
     granary(s, Object.values(paid).reduce((a, b) => a + b, 0), { round: 'r3', kind: 'collect' });
-    if (famine.length) stab(s, -famine.length, { round: 'r3', kind: 'famine', n: famine.length });
+    if (famine.length) stab(s, -FAMINE_COST * famine.length, { round: 'r3', kind: 'famine', n: famine.length });
+    // Hunger: villages left under 2 sacks (after the ±2) that are not in famine; −1 for every 5.
+    const adj = (q) => (s.res.r2.low.includes(q) ? -2 : s.res.r2.high.includes(q) ? 2 : 0);
+    const hungry = pidsByN(s).filter((q) => !famine.includes(q) && Math.max(0, s.deals.A[q] - paid[q] + adj(q)) < HUNGRY_BELOW);
+    const hc = Math.floor(hungry.length / HUNGRY_PER);
+    if (hc) stab(s, -hc, { round: 'r3', kind: 'hunger', n: hungry.length });
   }
   if (s.phase === 'r3_done') {
     // Inspectors by lot, from provinces on phones (an inspector needs a screen to choose).
@@ -351,7 +365,7 @@ export function publicView(s) {
   if (s.res.r3) {
     const A = s.deals.A, r3 = s.res.r3;
     v.r3 = {
-      trueTotal: sum(A), reportedTotal: sum(s.reports.r2), taken: sum(r3.paid), famine: ns(s, r3.famine), rate: r3.rate,
+      trueTotal: sum(A), r1True: sum(s.deals.A0 || A), boost: s.deals.A0 ? sum(A) - sum(s.deals.A0) : 0, reportedTotal: sum(s.reports.r2), taken: sum(r3.paid), famine: ns(s, r3.famine), rate: r3.rate,
       hungry: ns(s, pids.filter((q) => L[q].hungry)),
       rows: pids.map((q) => ({ n: nOf(s, q), card: A[q], r1: s.reports.r1[q] ?? null, r2: s.reports.r2[q] ?? null,
         take: r3.take[q], paid: r3.paid[q], famine: r3.famine.includes(q),

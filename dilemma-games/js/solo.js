@@ -78,8 +78,15 @@ function start() {
       </div>`;
   }
 
+  // Village mode: the computer Chairman's secret character, revealed at the end.
+  function chairReveal(s) {
+    const t = saved.mem.chairType, offered = s.policy.premium && s.premium !== null;
+    const what = !offered ? 'The regime fell before he had to decide.' : s.premium ? 'This time he paid.' : 'This time he broke it.';
+    return `<p><b>The Chairman you faced ${t === 'keeps' ? 'keeps his word' : 'breaks his word whenever paying would leave the cities short'}.</b> ${what} Half the computer Chairmen are of each kind, and nobody is told which until now.</p>`;
+  }
+
   // The Chairman's desk ("play as the Chairman"): the decisions, and what the villages told you.
-  const DECIDE = { r1_done: 'k', r2_done: 'rate', r3_done: 'inspectors', r4a_done: 'premium' };
+  const DECIDE = { r1_done: ['k', 'rate'], r3_done: ['inspectors'], r4a_done: ['premium'] };
   function desk(s) {
     const pub = E.publicView(s), seen = E.chairView(s), P = s.policy, ph = s.phase, R = s.regime, n = Object.keys(s.players).length;
     const decided = saved.mem.decided || (saved.mem.decided = {});
@@ -89,14 +96,14 @@ function start() {
     else if (ph === 'r1') h += '<p>The villages are reporting their first harvest. Nothing depends on it.</p>';
     else if (ph === 'r1_done') {
       h += `<h3>How hard do you push the Plan?</h3><p class="small">The villages say they grew <b>${pub.r1.total}</b> sacks. After the harvest the cities will need <b>${E.NEED_PER * n}</b>.</p>
-        <div class="rolepick">${opt('k', 0, 'No quota', 'Nobody punished or promoted. The villages have no reason to lie.')}${opt('k', 2, 'Two each way', 'The 2 lowest reports re-educated (−2 sacks), the 2 highest promoted (+2).')}${opt('k', 3, 'Three each way', 'The 3 lowest re-educated, the 3 highest promoted. A second re-education means the purge.')}</div>`;
-    } else if (ph === 'r2_brief' || ph === 'r2') h += `<p>Your Plan has been announced. The villages are reporting.</p>`;
-    else if (ph === 'r2_done') {
-      const reps = Object.values(seen.r2 || {});
+        <div class="rolepick">${opt('k', 0, 'No quota', 'Nobody punished or promoted. The villages have no reason to inflate.')}${opt('k', 2, 'Two each way', `The 2 lowest reports re-educated (−2 sacks), the 2 highest promoted (+2). Mobilisation: every village really grows ${E.QUOTA_BOOST[2]} more.`)}${opt('k', 3, 'Three each way', `The 3 lowest re-educated, the 3 highest promoted; a second re-education means the purge. Mobilisation: every village really grows ${E.QUOTA_BOOST[3]} more.`)}</div>`;
+      const reps = Object.values(seen.r1 || {});
       const proj = (r) => reps.reduce((a, x) => a + Math.ceil(x * r), 0);
-      h += `<h3>How much grain do you take?</h3><p class="small">The villages report <b>${pub.r2.total}</b> sacks in all. The cities need <b>${R.need || E.NEED_PER * n}</b>. You cannot see what they really grew: if a village cannot pay, it hands over everything, and that is a famine (Stability −1 each).</p>
-        <div class="rolepick">${E.RATES.map((r) => opt('rate', r, `${HarvestUI.RATE_WORD[r][0].toUpperCase()}${HarvestUI.RATE_WORD[r].slice(1)} of each report`, `If the reports are true, you collect ${proj(r)}.`)).join('')}</div>`;
-    } else if (ph === 'r3_done') {
+      h += `<h3>How much grain will you take?</h3><p class="small">Announced with the Plan, so the villages hear it before they report. If the villages report what they did in Round 1, each choice collects the sacks shown. You will not see what they really grow: a village that cannot pay hands over everything, and that is a famine (Stability −${E.FAMINE_COST} each). A village left with under ${E.HUNGRY_BELOW} sacks goes hungry (Stability −1 for every ${E.HUNGRY_PER}).</p>
+        <div class="rolepick">${E.RATES.map((r) => opt('rate', r, `${HarvestUI.RATE_WORD[r][0].toUpperCase()}${HarvestUI.RATE_WORD[r].slice(1)} of each report`, `About ${proj(r)} sacks.`)).join('')}</div>`;
+    } else if (ph === 'r2_brief' || ph === 'r2') h += `<p>Your Plan has been announced: ${E.quotaK(s) ? `the ${E.quotaK(s)} lowest re-educated and the ${E.quotaK(s)} highest promoted` : 'no quota'}, and ${HarvestUI.RATE_WORD[P.rate]} of each report taken. The villages are reporting.</p>`;
+    else if (ph === 'r2_done') h += `<p>The villages report <b>${pub.r2.total}</b> sacks in all. Continue to collect ${HarvestUI.RATE_WORD[P.rate]} of each report.</p>`;
+    else if (ph === 'r3_done') {
       h += `<h3>Do you pay for inspectors?</h3><p class="small">Each inspector checks about a third of the villages and catches any report off by 2 or more. Each costs <b>${E.INSPECTOR_COST}</b> sacks from the granary (now ${R.granary}; the cities need ${R.need}). A new harvest is coming.</p>
         <div class="rolepick">${[0, 1, 2].map((k) => opt('inspectors', k, k ? `${k === 1 ? 'One inspector' : 'Two inspectors'}` : 'No inspectors', k ? `Granary ${R.granary} → ${Math.max(0, R.granary - E.INSPECTOR_COST * k)}.` : 'Free, but nobody checks anything.')).join('')}</div>`;
     } else if (ph === 'r4_brief' || ph === 'r4a' || ph === 'r4a_check') h += '<p>The villages are reporting their new harvest.</p>';
@@ -129,7 +136,7 @@ function start() {
     const chk0 = E.canAdvance(s);
     // The Harvest engine lets the leader close a round early; here we wait for you.
     const mine = game === 'harvest' && !s.regime.fell && (chair
-      ? (DECIDE[s.phase] && !(saved.mem.decided || {})[DECIDE[s.phase]])
+      ? (DECIDE[s.phase] && DECIDE[s.phase].some((k) => !(saved.mem.decided || {})[k]))
       : ((E.REPORT_PHASES[s.phase] && !(priv.inspector && s.phase.startsWith('r4')) && !(s.phase === 'r4b' && priv.pledged) && priv.myReport == null)
         || ((s.phase === 'r4a_check' || s.phase === 'r4b_check') && priv.inspector && !(priv.checks && priv.checks.length))
         || (s.phase === 'r4b_poll' && !priv.inspector && priv.pledged == null)));
@@ -141,7 +148,7 @@ function start() {
       <span class="why">${chk.ok ? 'Everyone has moved. Continue when you are ready.' : `${icon('arrow')} <b>Your move:</b> use the panel marked “You”.`}</span></div>`;
     app.innerHTML = top(`<button class="btn ghost" data-solo="restart">Start again</button>`)
       + `<div class="cols"><div class="board-wrap"><div class="caps">${U.esc(board.round)}</div>${board.main}${nextBtn}
-        ${over ? `<div class="card">${DEBRIEF[chair ? 'chairman' : game]}<div class="rowc"><button class="btn primary" data-solo="restart">Play again</button></div></div>` : ''}</div>
+        ${over ? `<div class="card">${DEBRIEF[chair ? 'chairman' : game]}${chair && pub.r3?.boost ? `<p><b>Your quota's mobilisation added ${pub.r3.boost} real sacks. The reports grew by ${pub.r2.total - pub.r1.total}.</b> You taxed the reports, not the grain.</p>` : ''}${game === 'harvest' && !chair && saved.mem.chairType ? chairReveal(s) : ''}<div class="rowc"><button class="btn primary" data-solo="restart">Play again</button></div></div>` : ''}</div>
         <div><div class="youpane"><div class="caps">${icon('phone')} ${youLabel}</div><div class="phone">${chair ? desk(s) : G.phoneView(pub, priv).replace(/the projector/g, 'the board')}</div>${over ? '' : nextBtn}</div></div></div>`;
   }
 
