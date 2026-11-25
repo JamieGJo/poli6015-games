@@ -40,8 +40,9 @@ function start() {
   const top = (extra = '') => `<div class="top"><div><span class="gname">${G.TITLE}</span> <span class="muted small" style="color:#c9ccd6">against the computer</span></div>
     <div class="rowc">${extra}<a class="btn ghost" href="index.html">All games</a></div></div>`;
 
+  let style = 'balanced';  // the computer Palace's style, chosen when you play a province
   function newGame(role) {
-    const r = game === 'harvest' ? B.harvestSetup(fairRandom) : B.petitionSetup(fairRandom, role);
+    const r = game === 'harvest' ? B.harvestSetup(fairRandom) : B.petitionSetup(fairRandom, role, style);
     saved = { role: role || 'village', s: r.s, mem: r.mem, at: Date.now() };
     LS.set(key, saved); render();
   }
@@ -50,8 +51,13 @@ function start() {
     const seats = [['palace', 'The Palace', 'Rule Valmora. Spend 8 tokens a year on aid, police and petition boxes, and keep the Police Chief in check. You never see how angry the provinces really are.']]
       .concat(E.PROVS.map((k) => [k, E.SEAT_NAME[k], `Play the ${PetitionUI.PROV[k].people}. You know your own grievance and choose what to show the Palace: praise, silence, a petition or a protest.`]));
     app.innerHTML = top() + `<div class="explain"><div class="exart">${palaceScene()}</div><div><h2>Who do you want to be?</h2>
-      <p>The computer plays everyone else, using simple rules: its provinces signal their real mood, though some protest when they could stay quiet; its Palace answers petitions, polices protests and buys the rival agency when the Chief grows strong; its Chief strikes when the odds are one in three or better.</p></div></div>
-      <div class="rolepick">${seats.map(([k, name, blurb]) => `<button class="btn" data-role="${k}"><b>${name}</b><span class="small">${blurb}</span></button>`).join('')}</div>`;
+      <p>The computer plays everyone else, using simple rules: its provinces signal their real mood, though some protest when they could stay quiet; its Chief strikes when the odds are one in three or better.</p></div></div>
+      <div class="rolepick">${seats.slice(0, 1).map(([k, name, blurb]) => `<button class="btn" data-role="${k}"><b>${name}</b><span class="small">${blurb}</span></button>`).join('')}</div>
+      <h3 style="margin-top:18px">Or play a province</h3>
+      <p class="small">First choose how the computer Palace rules:</p>
+      <div class="rowc">${Object.entries(B.PALACE_STYLES).map(([k, t]) => `<button class="btn ${style === k ? 'primary' : ''}" data-style="${k}" aria-pressed="${style === k}">${t.split(':')[0]}</button>`).join('')}</div>
+      <p class="small muted">${((t) => t.charAt(0).toUpperCase() + t.slice(1))(B.PALACE_STYLES[style].split(': ')[1])}${style === 'harsh' ? ' Watch the Police Chief.' : ''}</p>
+      <div class="rolepick">${seats.slice(1).map(([k, name, blurb]) => `<button class="btn" data-role="${k}"><b>${name}</b><span class="small">${blurb}</span></button>`).join('')}</div>`;
   }
 
   function intro() {
@@ -78,7 +84,8 @@ function start() {
       || (s.phase === 'r4b_poll' && priv.believe == null));
     const chk = mine ? { ok: false } : chk0;
     const over = game === 'harvest' ? s.phase === 'end' : s.step === 'end';
-    const youLabel = game === 'harvest' ? `You: village ${priv.n}` : `You: ${E.SEAT_NAME[saved.role]}`;
+    const youLabel = game === 'harvest' ? `You: village ${priv.n}`
+      : `You: ${E.SEAT_NAME[saved.role]}${saved.role !== 'palace' ? ` · computer Palace: ${(saved.mem.palaceStyle || 'balanced') === 'harsh' ? 'harsh' : 'balanced'}` : ''}`;
     const nextBtn = over ? '' : `<div class="next"><button class="btn primary" data-solo="next" ${chk.ok ? '' : 'disabled'}>${U.esc(board.next || 'Continue')} →</button>
       <span class="why">${chk.ok ? 'Everyone has moved. Continue when you are ready.' : `${icon('arrow')} <b>Your move:</b> use the panel marked “You”.`}</span></div>`;
     app.innerHTML = top(`<button class="btn ghost" data-solo="restart">Start again</button>`)
@@ -88,6 +95,8 @@ function start() {
   }
 
   app.addEventListener('click', (e) => {
+    const st = e.target.closest('[data-style]');
+    if (st) { style = st.dataset.style; return rolePicker(); }
     const r = e.target.closest('[data-role]');
     if (r) return newGame(r.dataset.role);
     const so = e.target.closest('[data-solo]');

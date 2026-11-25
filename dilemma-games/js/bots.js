@@ -75,23 +75,36 @@ export function chairmanHonours(s) {
 
 // ================= The Petition Box =================
 // You play the Palace or one province. The computer plays everyone else.
-// Computer Palace: the "balanced" plan from the engine check. Computer provinces: each is
+// Computer Palace, two styles (both from the engine check):
+//   balanced: answers petitions, polices last year's protests, opens two boxes in Year 1,
+//             sends aid elsewhere, buys the rival agency once Strength reaches 3;
+//   harsh:    police in every province every year, the rest paid to the Chief ("repressor").
+export const PALACE_STYLES = {
+  balanced: 'Balanced: answers petitions, polices protests, sends aid, and buys a rival agency when the police grow strong.',
+  harsh: 'Harsh: police in every province every year, and the rest of the budget paid to the Police Chief.',
+};
+// Computer provinces: each is
 // either sincere (signals its real mood) or mixed (protests 35% of the time regardless).
 // Computer Chief: strikes when the chance of success is at least one in three.
-export function petitionSetup(rand, mySeat) {
+export function petitionSetup(rand, mySeat, palaceStyle = 'balanced') {
   let s = P.newGame('SOLO', {}, rand);
   for (const seat of P.SEATS) {
     const pid = seat === mySeat ? ME : `bot-${seat}`;
     s = P.applyAction(s, { type: 'join', pid, key: pid, seat });
   }
   const kinds = Object.fromEntries(P.PROVS.map((k) => [k, rand() < 0.5 ? 'sincere' : 'mixed']));
-  return { s: P.advance(s, rand), mem: { kinds, last: {}, known: {}, mySeat, lastYear: 0 } };
+  return { s: P.advance(s, rand), mem: { kinds, last: {}, known: {}, mySeat, lastYear: 0, palaceStyle: PALACE_STYLES[palaceStyle] ? palaceStyle : 'balanced' } };
 }
 
-function palacePlan(pub, last) {
+function palacePlan(pub, last, style = 'balanced') {
   let tok = P.TOKENS; const plan = { gifts: {}, police: {}, open: {}, answer: {}, pay: 0, save: 0, rival: false };
   const spend = (c) => (tok >= c ? ((tok -= c), true) : false);
   const K = P.PROVS;
+  if (style === 'harsh') {
+    K.forEach((k) => { if (spend(1)) plan.police[k] = true; });
+    while (spend(1)) plan.pay += 1;
+    return plan;
+  }
   let strength = pub.strength;
   if (strength >= 3 && !pub.rival && spend(P.RIVAL_COST)) { plan.rival = true; strength = Math.floor(strength / 2); }
   K.forEach((k) => { if (pub.pending[k] && spend(1)) plan.answer[k] = true; });
@@ -128,7 +141,7 @@ export function petitionBots(s, mem, rand) {
       act('palace', { type: 'whisper', prov: P.PROVS[Math.floor(rand() * 4)] });
       const w = P.privateView(t, pidOf('palace')).whisper; if (w) mem.known[w.prov] = w.band;
     }
-    act('palace', { type: 'plan', plan: palacePlan(P.publicView(t), mem.last) });
+    act('palace', { type: 'plan', plan: palacePlan(P.publicView(t), mem.last, mem.palaceStyle) });
   }
   if (t.step === 'signals') {
     for (const k of P.PROVS) if (bot(k) && !t.signals[k]) act(k, { type: 'signal', signal: provinceSignal(mem.kinds[k], P.privateView(t, pidOf(k)), rand) });
