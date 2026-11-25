@@ -42,3 +42,20 @@ export function meter(value, max, { mark = null, cls = '' } = {}) {
   for (let i = 1; i <= max; i++) cells += `<span class="cell ${i <= value ? 'on' : ''} ${mark && i === mark ? 'mark' : ''}"></span>`;
   return `<div class="meter ${cls}">${cells}</div>`;
 }
+
+// ---------- shared pieces for the redesigned screens ----------
+// A row of numbered steps, the current one highlighted.
+export function stepper(steps, current) {
+  const i = steps.findIndex((s) => s.key === current);
+  return `<ol class="stepper">${steps.map((s, j) => `<li class="${j < i ? 'done' : j === i ? 'on' : ''}"><span>${j + 1}</span>${s.label}</li>`).join('')}</ol>`;
+}
+// "What is happening / who acts / what to do" banner.
+export function explain({ title, what, who = '', todo = '', art = '' }) {
+  return `<div class="explain">${art ? `<div class="exart">${art}</div>` : ''}<div><h2>${title}</h2>${what ? `<p>${what}</p>` : ''}
+    ${who || todo ? `<div class="exrow">${who ? `<div><span class="caps">Who acts</span><p>${who}</p></div>` : ''}${todo ? `<div><span class="caps">What to do</span><p>${todo}</p></div>` : ''}</div>` : ''}</div></div>`;
+}
+// A change shown as before → after, with a reason.
+export const change = (label, from, to, why = '') =>
+  `<div class="chg"><span class="chl">${label}</span><span class="chv"><b>${from}</b> → <b class="${to > from ? 'upv' : to < from ? 'downv' : ''}">${to}</b></span>${why ? `<span class="chw">${why}</span>` : ''}</div>`;
+export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+export const minus = (n) => (n < 0 ? `−${-n}` : `${n}`);
