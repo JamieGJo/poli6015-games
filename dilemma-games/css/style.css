@@ -378,3 +378,9 @@ details.raw { margin-top: 8px; font-size: .9rem; } details.raw summary { cursor:
 .linkchip { cursor: pointer; border: 1px solid var(--line); font: inherit; }
 .linkchip:hover { border-color: var(--accent); text-decoration: line-through; }
 .regev .chg .upv { color: var(--ok); } .regev .chg .downv { color: var(--accent); }
+
+/* Petition: the province's goal panel (2026-11-26) */
+.goal { padding: 10px 12px; margin: 8px 0; }
+.goal summary { cursor: pointer; }
+.goal .score { display: block; margin-top: 4px; }
+.goal ul { margin: 8px 0 4px; padding-left: 18px; }

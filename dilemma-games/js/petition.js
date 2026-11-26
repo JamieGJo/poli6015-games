@@ -16,6 +16,7 @@ export const BAND_NAME = { L: 'Calm (0–3)', M: 'Restless (4–6)', H: 'Angry (
 export const BAND_WORD = { L: 'calm', M: 'restless', H: 'angry' };
 const clamp = (g) => Math.max(0, Math.min(10, g));
 export const TOKENS = 8, STAB0 = 12, COUP_FROM = 6, COUP_NEEDS = 11, SIMMER = 8, GIFT_MAX = 3, RIVAL_COST = 3;
+export const NEGLECT_FROM = 7; // an angry province (7+) given neither aid nor an answer this year costs 1 Stability
 export const STEPS = ['palace', 'event', 'signals', 'resolve', 'chief', 'ear'];
 
 export const DEFAULT_SETTINGS = {
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   boxCost: 2,            // design: 2. Open option: 1.
   event3: 'none',        // design: no rule. Option 'answer3': answering a petition made in an Event 3 year removes 3.
   coordNeedsPetition: false, // design: no link. Option: coordination counts only if a petition was read aloud this year or last.
+  neglect: true,         // added 2026-11-26: ignored anger costs Stability. Off reproduces the earlier rules (and the Python simulation).
 };
 
 const clone = (s) => JSON.parse(JSON.stringify(s));
@@ -32,7 +34,7 @@ export function newGame(room, settings = {}, rand = Math.random) {
   const prov = {};
   PROVS.forEach((k, i) => { prov[k] = { g: starts[i], pts: 0, box: false, police: false, pending: null, gifts: 0, answered: 0, protests: 0, crushed: 0, event: null, eventYear: 0, notes: [] }; });
   return {
-    game: 'petition', v: 2, room, settings: { ...DEFAULT_SETTINGS, ...settings },
+    game: 'petition', v: 3, room, settings: { ...DEFAULT_SETTINGS, ...settings },
     seats: {}, players: {}, year: 0, step: 'lobby', stab: STAB0, strength: 0, prov,
     palace: { saved: 0, rival: false, rivalYear: 0, paid: 0, whisper: null, est: {}, plan: null, spent: null },
     chiefs: [{ score: 0, from: 1 }], chiefPurged: false,
@@ -298,6 +300,12 @@ function resolve(s) {
   // The leader does not say where the anger is: that would tell the Palace a province's grievance.
   const simmer = PROVS.filter((k) => s.prov[k].g >= SIMMER).length;
   if (simmer) { s.stab -= simmer; RS.items.push({ kind: 'simmer', n: simmer, d: simmer }); lines.push(`Simmering anger in ${simmer === 1 ? 'one province' : `${simmer} provinces`} (which, the Palace does not know): Stability −${simmer}.`); }
+  // Ignored anger: an angry province that got neither aid nor an answer this year. Announced as a count only.
+  if (s.settings.neglect !== false) {
+    const pl = s.palace.plan || normPlan({});
+    const ignored = PROVS.filter((k) => s.prov[k].g >= NEGLECT_FROM && !pl.gifts[k] && !pl.answer[k]).length;
+    if (ignored) { s.stab -= ignored; RS.items.push({ kind: 'neglect', n: ignored, d: ignored }); lines.push(`${ignored === 1 ? 'One angry province was' : `${ignored} angry provinces were`} given nothing this year (which, the Palace does not know): Stability −${ignored}.`); }
+  }
   s.revealed = revealed;
   RS.stabTo = Math.max(0, s.stab); RS.strengthTo = s.strength; s.lastResolve = RS;
   for (const l of lines) say(s, l, l.includes('crushed') ? 'warn' : '');

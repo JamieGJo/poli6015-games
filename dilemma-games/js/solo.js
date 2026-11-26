@@ -29,7 +29,8 @@ const DEBRIEF = {
     <li>Did police make the provinces calmer, or only quieter? What did they do to the Police Chief's strength?</li>
     <li>Was opening a petition box worth 2 tokens?</li>
     <li>Who hid their grievance because they did not know where the police were? Would you have protested if you had known?</li>
-    <li>Did the Palace ever reward a province that protested? What did that teach the other provinces?</li></ul>
+    <li>Did the Palace ever reward a province that protested? What did that teach the other provinces?</li>
+    <li>Which angry provinces did the Palace ignore, and what did it cost?</li></ul>
     <p class="small muted">Wintrobe (1998), ch. 1: the paradox and the subject's dilemma (p. 22); repression and loyalty (p. 33); the security forces as the main threat (p. 34).</p>`,
 };
 

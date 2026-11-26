@@ -104,6 +104,7 @@ function whatHappened(v) {
     if (it.kind === 'protest') rows.push(['protest', 'bad', `<b>${N[it.prov]}</b> protested: a ${it.size} protest, with no police there. Stability −${it.d}.`]);
     if (it.kind === 'crushed') rows.push(['crushed', 'warn', `<b>${N[it.prov]}</b> protested (${it.size}), and the police crushed it. No stability lost, but Police Strength +1, and the province's grievance rises.`]);
     if (it.kind === 'coord') rows.push(['protest', 'bad', `${it.n} provinces protested at once: the protests feed each other. Stability −1.`]);
+    if (it.kind === 'neglect') rows.push(['info', 'bad', `${it.n === 1 ? 'One angry province' : `${it.n} angry provinces`} (grievance 7 or more) got neither aid nor an answer this year. The Palace is not told which. Stability −${it.d}.`]);
     if (it.kind === 'simmer') rows.push(['info', 'bad', `Anger is simmering in ${it.n === 1 ? 'one province' : `${it.n} provinces`} (grievance 8 or more). The Palace is not told which. Stability −${it.d}.`]);
   }
   rows.push(['stability', R.stabTo < R.stabFrom ? 'bad' : '', `Stability ${R.stabFrom} → <b>${R.stabTo}</b>.${R.strengthTo !== R.strengthFrom ? ` Police Strength ${R.strengthFrom} → <b>${R.strengthTo}</b>.` : ''}`]);
@@ -132,6 +133,7 @@ export function hostView(v, ctx) {
           <label>Opening a box costs <select data-set="boxCost"><option value="2" ${v.settings.boxCost === 2 ? 'selected' : ''}>2 (design)</option><option value="1" ${v.settings.boxCost === 1 ? 'selected' : ''}>1</option></select></label>
           <label>Petitions about a corrupt official <select data-set="event3"><option value="none" ${v.settings.event3 === 'none' ? 'selected' : ''}>no special rule (design)</option><option value="answer3" ${v.settings.event3 === 'answer3' ? 'selected' : ''}>an answer removes 3</option></select></label>
           <label>Protests feeding each other <select data-set="coordNeedsPetition"><option value="0" ${!v.settings.coordNeedsPetition ? 'selected' : ''}>any two unpoliced protests (design)</option><option value="1" ${v.settings.coordNeedsPetition ? 'selected' : ''}>only after a petition is read aloud</option></select></label>
+          <label>Angry provinces given nothing <select data-set="neglect"><option value="1" ${v.settings.neglect !== false ? 'selected' : ''}>cost 1 stability each (design)</option><option value="0" ${v.settings.neglect === false ? 'selected' : ''}>cost nothing</option></select></label>
           <p class="small muted">The last three are not yet simulated.</p></div>
         <p class="small"><b>Tell the provinces:</b> provinces are ranked against each other on points, and the winning province is named at the end.</p>` : ''}
       </div></div>`;
@@ -190,13 +192,14 @@ function endView(v, ctx = {}) {
     ${v.history.map((h) => `<tr><td class="small">Year ${h.year}</td>${E.PROVS.map((k) => cell(h, k)).join('')}</tr>`).join('')}</table>
     <p class="small muted">True mood (grievance in brackets) at the end of each year, the Palace's guess (green: right, red: wrong), and the signal sent.</p>
   </div><div>
-    <div class="card"><div class="caps">Provinces, ranked</div>${S.order.map((k) => `<div class="rowb"><span>${S.prov[k].rank}. ${N[k]}</span><span>${minus(S.prov[k].pts)} ${Math.abs(S.prov[k].pts) === 1 ? 'point' : 'points'} − grievance ${S.prov[k].g} = <b>${minus(S.prov[k].total)}</b></span></div>`).join('')}</div>
+    <div class="card"><div class="caps">Provinces, ranked</div>${S.order.map((k) => { const F = v.final[k]; return `<div class="rowb"><span>${S.prov[k].rank}. ${N[k]}</span><span>${minus(S.prov[k].pts)} ${Math.abs(S.prov[k].pts) === 1 ? 'point' : 'points'} − grievance ${S.prov[k].g} = <b>${minus(S.prov[k].total)}</b></span></div><p class="small muted" style="margin:0 0 6px">Aid ${F.gifts} · petitions answered ${F.answered} · protests ${F.protests}${F.crushed ? ` (${F.crushed} crushed)` : ''}</p>`; }).join('')}</div>
     <div class="card"><div class="caps">The Palace</div><p class="small">${S.palace.years} years survived × 3 = ${S.palace.yearsPts}; saved abroad ${S.palace.saved}${S.palace.keepSaved ? '' : ' (lost: less than 5 when the regime fell)'}; right guesses ${S.palace.correct}. <b>Total ${S.palace.total}.</b></p></div>
     <div class="card"><div class="caps">Police Chief${S.chiefs.length > 1 ? 's' : ''}</div><p class="small">${S.chiefs.map((c, i) => `Chief ${i + 1}: ${c.score}`).join(' · ')}</p></div>
   </div></div>
   <div class="card flat"><div class="caps">Debrief</div><ol class="small">
     <li>Did police buy safety, or blindness? Wintrobe's paradox (p. 22), beside Mobutu's officials reporting that "the situation is calm" (pp. 24–25).</li>
     <li>Who praised while angry, and why? Who protested or petitioned while calm?</li>
+    <li>Which angry provinces did the Palace ignore, and what did it cost?</li>
     <li>Who hid their grievance because they did not know where the police were? Would you have protested if you had known?</li>
     <li>Did the Palace ever reward a province that protested? What did that teach the other provinces?</li>
     <li>What did the rival agency and the payments to the Chief buy? Was the Police Chief more dangerous than the provinces (p. 34)?</li>
@@ -208,7 +211,7 @@ export function hostCommand(s, d) {
   if (d.cmd === 'free') return E.freeSeat(s, d.seat);
   if (d.cmd === 'setting' && s.step === 'lobby') {
     const t = JSON.parse(JSON.stringify(s));
-    const val = d.key === 'years' || d.key === 'boxCost' ? Number(d.value) : d.key === 'coordNeedsPetition' ? d.value === '1' : d.value;
+    const val = d.key === 'years' || d.key === 'boxCost' ? Number(d.value) : d.key === 'coordNeedsPetition' || d.key === 'neglect' ? d.value === '1' : d.value;
     t.settings[d.key] = val;
     return t;
   }
@@ -253,7 +256,7 @@ function grievanceBlock(me) {
     <div class="gnum">${me.g}<small> / 10 · your people are </small>${moodChip(me.band)}</div>
     <div class="gauge10">${cells}</div>
     <div class="moodscale"><div class="L ${me.band === 'L' ? 'on' : ''}">calm 0–3</div><div class="M ${me.band === 'M' ? 'on' : ''}">restless 4–6</div><div class="H ${me.band === 'H' ? 'on' : ''}">angry 7–10</div></div>
-    <div class="small muted">${GLOSS.grievance} At 8 or more, anger simmers and costs the regime 1 stability a year, whatever you say.</div></div>`;
+    <div class="small muted">${GLOSS.grievance} At 7 or more, the regime loses 1 stability in any year it gives you neither aid nor an answer. At 8 or more, anger simmers and costs it 1 more, whatever you say.</div></div>`;
 }
 
 function noteStories(me) {
@@ -271,15 +274,28 @@ function noteStories(me) {
   return out.map(([c, i, t]) => `<div class="story ${c}">${icon(i)}<p>${t}</p></div>`).join('');
 }
 
+// The province's goal and live score, on every step.
+function goalPanel(me) {
+  const score = me.pts - me.g;
+  return `<details class="card flat goal" open><summary><b>Your goal:</b> the best score of the four provinces. <span class="score">Score now: ${minus(me.pts)} ${Math.abs(me.pts) === 1 ? 'point' : 'points'} − grievance ${me.g} = <b>${minus(score)}</b></span></summary>
+    <ul class="small">
+      <li><b>Aid</b> from the Palace: +1 point and grievance −1 per crate.</li>
+      <li><b>An answered petition:</b> +2 points and grievance −2. An ignored one: grievance +1.</li>
+      <li><b>A protest:</b> −1 point. If the police are there: −3 in all and grievance +1.</li>
+      <li><b>If the regime falls</b> in a year you protest: +3.</li>
+    </ul><p class="small muted">A calm, well-paid province wins. Your anger counts against you at the end.</p></details>`;
+}
+
 function provinceView(v, me) {
   let h = '';
   if (v.step === 'lobby') {
     return `<div class="card">${valmoraMap({ you: me.seat, prov: {} })}<h3>You are ${N[me.seat]}: ${PROV[me.seat].people}</h3><p>${PROV[me.seat].blurb}</p>
-      <p><b>Your goal:</b> finish with the most points of the four provinces. You gain a point for every crate of aid and 2 for every petition the Palace answers. A protest costs 1 point (3 if the police crush it). At the end, your grievance is taken off your points.</p></div>
+      <p><b>Your goal:</b> the best score of the four provinces. Your score is your points minus your grievance at the end, so a calm, well-paid province wins.</p>
+      <p class="small">Aid and answered petitions earn points and cool your anger. Protests cost points but shake the regime; if it falls in a year you protest, you gain 3.</p></div>
       ${grievanceBlock(me)}<p class="muted">Wait for the leader to start Year 1.</p>`;
   }
-  h += grievanceBlock(me);
-  h += `<p class="small">Points so far: <b>${minus(me.pts)}</b> · petition box ${me.box ? '<b>open</b>' : 'closed'}${me.police ? ' · <b class="bad">police are here this year</b>' : ''}${me.pending ? ' · your petition is waiting for an answer' : ''}</p>`;
+  h += grievanceBlock(me) + goalPanel(me);
+  h += `<p class="small">Petition box ${me.box ? '<b>open</b> (it stays open for the rest of the game)' : 'closed: only the Palace can open one'}${me.police ? ' · <b class="bad">police are here this year</b>' : ''}${me.pending ? ' · your petition is waiting for an answer' : ''}</p>`;
   const stories = noteStories(me);
   if (stories && v.step !== 'palace') h += `<div class="caps">This year</div>${stories}`;
   if (v.step === 'signals') {
